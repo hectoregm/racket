@@ -19,6 +19,14 @@
           (arg-name symbol?)
           (body F1WAE?)])
 
+;; lookup-fundef : symbol listof(FunDef) -→ FunDef 
+(define (lookup-fundef fun-name fundefs)
+  (cond
+    [(empty? fundefs) (error fun-name "function not found")]
+    [else (if (symbol=? fun-name (fundef-fun-name (first fundefs)))
+              (first fundefs)
+              (lookup-fundef fun-name (rest fundefs)))]))
+
 (define (parse sexp)
   (cond
     [(number? sexp) (num sexp)]
@@ -31,7 +39,9 @@
                  (parse (third sexp)))]
        [(with) (with (first (second sexp))
                      (parse (second (second sexp)))
-                     (parse (third sexp)))])]))
+                     (parse (third sexp)))]
+       [else (app (first sexp)
+                  (parse (second sexp)))])]))
 
 (define (subst expr sub-id val)
   (type-case F1WAE expr
@@ -49,10 +59,11 @@
                     (subst named-expr sub-id val)
                     (subst bound-body sub-id val)))]
     [id (v) (if (symbol=? v sub-id) val expr)]
-    [else empty]))
+    [app (fun-name arg-expr)
+         (app fun-name (subst arg-expr sub-id val))]))
 
 
-;; calc : WAE -> number
+;; calc : F1WAE -> number
 (define (calc expr)
   (type-case F1WAE expr
     [num (n) n]
@@ -64,7 +75,6 @@
                       (num (calc named-expr))))]
     [id (v) (error 'calc "free identifier")]
     [else empty]))
-
 (test (calc (parse '3)) 3)
 (test (calc (parse '{+ 3 4})) 7)
 (test (calc (parse '{+ {- 3 4} 7})) 6)
@@ -77,3 +87,47 @@
 (test (calc (parse '{with {x 5} {+ x {with {y 3} x}}})) 10)
 (test (calc (parse '{with {x 5} {with {y x} y}})) 5)
 (test (calc (parse '{with {x 5} {with {x x} x}})) 5)
+
+;; interp : F1WAE listof(fundef) -> number
+;; evaluates F1WAE expressions by reducing them to their corresponding values
+
+(define (interp expr fun-defs)
+  (type-case F1WAE expr
+  [num (n) n]
+  [add (l r) (+ (interp l fun-defs)
+                (interp r fun-defs))]
+  [sub (l r) (- (interp l fun-defs)
+                (interp r fun-defs))]
+  [with (bound-id named-expr bound-body)
+        (interp (subst bound-body
+                       bound-id
+                       (num (interp named-expr fun-defs))) 
+                fun-defs)]
+  [id (v) (error 'interp "free identifier")]
+  [app (fun-name arg-expr)
+       (local ([define the-fun-def (lookup-fundef fun-name fun-defs)])
+         (interp (subst (fundef-body the-fun-def)
+                        (fundef-arg-name the-fun-def)
+                        (num (interp arg-expr fun-defs)))
+                 fun-defs))]))
+
+(test (interp (parse '3) '()) 3)
+(test (interp (parse '{+ 3 4}) '()) 7)
+(test (interp (parse '{+ {- 3 4} 7}) '()) 6)
+(test (interp (parse '{with {x {+ 5 5}} {+ x x}}) '()) 20)
+(test (interp (parse '{with {x 5} {+ x x}}) '()) 10)
+(test (interp (parse '{with {x {+ 5 5}} {with {y {- x 3}} {+ y y}}}) '()) 14)
+(test (interp (parse '{with {x 5} {with {y {- x 3}} {+ y y}}}) '()) 4)
+(test (interp (parse '{with {x 5} {+ x {with {x 3} 10}}}) '()) 15)
+(test (interp (parse '{with {x 5} {+ x {with {x 3} x}}}) '()) 8)
+(test (interp (parse '{with {x 5} {+ x {with {y 3} x}}}) '()) 10)
+(test (interp (parse '{with {x 5} {with {y x} y}}) '()) 5)
+(test (interp (parse '{with {x 5} {with {x x} x}}) '()) 5)
+
+(test (interp (parse '{double {double 5}})
+          (list (fundef 'double
+                        'n
+                        (add (id 'n) (id 'n))))) 20)
+(test (interp (parse '{f 5})
+              (list (fundef 'f 'n (app 'g (add (id 'n) (num 5))))
+                    (fundef 'g 'm (sub (id 'm) (num 1))))) 9)
