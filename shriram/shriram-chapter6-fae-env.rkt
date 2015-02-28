@@ -82,21 +82,7 @@
     [appS (f e) (app (desugar f)
                      (desugar e))]))
 
-(define (subst expr sub-id val)
-  (type-case FAE expr
-    [num (n) expr]
-    [add (l r) (add (subst l sub-id val)
-                    (subst r sub-id val))]
-    [sub (l r) (sub (subst l sub-id val)
-                    (subst r sub-id val))]
-    [id (v) (if (symbol=? v sub-id) val expr)]
-    [fun (p b) (if (symbol=? p sub-id)
-                   expr
-                   (fun p (subst b sub-id val)))]
-    [app (f e) (app (subst f sub-id val)
-                    (subst e sub-id val))]))
-
-;; add-numbers FAE FAE -> FAE
+;; num+ FAE FAE -> FAE
 ;; takes two num subtypes returns the sum in a new sum.
 (define (num+ numa numb)
   (numV (+ (numV-n numa)
@@ -106,9 +92,9 @@
   (numV (- (numV-n numa)
            (numV-n numb))))
 
-;; interp : FAE -> FAE
+;; interp : FAE DefrdSub -> FAE-Value
 ;; evaluates FAE expressions by reducing them to their corresponding values
-;; return values are either num or fun
+;; returns FAE-Value
 (define (interp expr ds)
   (type-case FAE expr
     [num (n) (numV n)]
@@ -119,11 +105,14 @@
          (closureV bound-id bound-body ds)]
     [app (fun-expr arg-expr)
          (local ([define fun-val (interp fun-expr ds)])
-           (interp (closureV-body fun-val)
-                   (aSub (closureV-param fun-val)
-                         (interp arg-expr ds)
-                         (closureV-ds fun-val))))]))
+           (if (closureV? fun-val)
+               (interp (closureV-body fun-val)
+                       (aSub (closureV-param fun-val)
+                             (interp arg-expr ds)
+                             (closureV-ds fun-val)))
+               (error 'interp (string-append (~a fun-expr) " expression is not a function"))))]))
 (test (interp (desugar (parse '3)) (mtSub)) (numV 3))
+(test (interp (desugar (parse '{fun {x} x})) (mtSub)) (closureV 'x (id 'x) (mtSub)))
 (test (interp (desugar (parse '{+ 3 4})) (mtSub)) (numV 7))
 (test (interp (desugar (parse '{+ {- 3 4} 7})) (mtSub)) (numV 6))
 (test (interp (desugar (parse '{with {x {+ 5 5}} {+ x x}})) (mtSub)) (numV 20))
