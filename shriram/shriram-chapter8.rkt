@@ -91,8 +91,7 @@
 (test (cparser '{with {x 3} x}) (app (fun 'x (id 'x)) (num 3)))
 (test (cparser '{with {x 10} {with {y {+ x 5}} {+ x y}}}) (app (fun 'x (app (fun 'y (add (id 'x) (id 'y))) (add (id 'x) (num 5)))) (num 10)))
 
-;; num+ FAE FAE -> FAE
-;; takes two num subtypes returns the sum in a new sum.
+;; num+ CFAE/L-Value CFAE/L-Value -> CFAE/L-Value
 (define (num+ numa numb)
   (numV (+ (numV-n numa)
            (numV-n numb))))
@@ -101,9 +100,7 @@
   (numV (- (numV-n numa)
            (numV-n numb))))
 
-;; interp : FAE DefrdSub -> FAE-Value
-;; evaluates FAE expressions by reducing them to their corresponding values
-;; returns FAE-Value
+;; interp : CFAE/L Env -> CFAE/L-Value
 (define (interp expr ds)
   (type-case CFAE/L expr
     [num (n) (numV n)]
