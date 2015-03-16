@@ -47,7 +47,14 @@
             (body CFAE/L?)
             (env Env?)]
   [exprV (expr CFAE/L?)
-         (env Env?)])
+         (env Env?)
+         (cache boxed-boolean/CFAE/L-Value?)])
+
+(define (boxed-boolean/CFAE/L-Value? v)
+  (and (box? v)
+       (or (boolean? (unbox v))
+           (numV? (unbox v))
+           (closureV? (unbox v)))))
 
 ;; lookup : symbol Env -> FAE-Value
 (define (lookup name env)
@@ -119,7 +126,16 @@
 ;; strict : CFAE/L-Value -> CFAE/L-Value [excluding exprV]
 (define (strict e)
   (type-case CFAE/L-Value e
-    [exprV (expr env) (strict (interp expr env))]
+    [exprV (expr env cache)
+           (if (boolean? (unbox cache))
+               (local ([define the-value (strict (interp expr env))])
+                 (begin
+                   (printf "Forcing exprV to ~a\n" the-value)
+                   (set-box! cache the-value)
+                   the-value))
+               (begin
+                 (printf "Using cached value ~a \n" (unbox cache))
+                 (unbox cache)))]
     [else e]))
 
 ;; interp : CFAE/L Env -> CFAE/L-Value
@@ -137,7 +153,7 @@
          (closureV bound-id bound-body env)]
     [app (fun-expr arg-expr)
          (local ([define fun-val (strict (interp fun-expr env))]
-                 [define arg-val (exprV arg-expr env)])
+                 [define arg-val (exprV arg-expr env (box false))])
            (if (closureV? fun-val)
                (interp (closureV-body fun-val)
                        (aSub (closureV-param fun-val)
@@ -163,11 +179,12 @@
 (test (rinterp (cparse '{with {x 5} {with {x x} x}})) (numV 5))
 (test (rinterp (cparse '{{fun {x} x} 3})) (numV 3))
 (test (rinterp (cparse '{{{fun {x} x} {fun {x} {+ x 5}}} 3})) (numV 8))
-(test (rinterp (cparse '{with {x 3} {fun {y} {+ x y}}})) (closureV 'y (add (id 'x) (id 'y)) (aSub 'x (exprV (num 3) (mtSub)) (mtSub))))
+(test (rinterp (cparse '{with {x 3} {fun {y} {+ x y}}})) (closureV 'y (add (id 'x) (id 'y)) (aSub 'x (exprV (num 3) (mtSub) '#&#f) (mtSub))))
 (test (rinterp (cparse '{with {x 3} {with {f {fun {y} {+ x y}}} {with {x 5} {f 4}}}})) (numV 7))
 (test (rinterp (cparse '{with {x 10} {{fun {y} {+ y x}} {+ 5 x}}})) (numV 25))
 (test (rinterp (cparse '{with {double {fun {x} {+ x x}}} {+ {double 5} {double 10}}})) (numV 30))
 (test (rinterp (cparse '{with {f {undef x}} 4})) (numV 4))
+(test (rinterp (cparse '{with {x {+ 4 5}} {with {y {+ x x}} {with {z y} {with {x 4} z}}}})) (numV 18))
 (test (rinterp (cparse '{if0 {+ 0 0} 0 1})) (numV 0))
 (test (rinterp (cparse '{with {f {fun {x} {+ x x}}} {if0 {- 5 {+ 2 3}} {f 2} {f 3}}})) (numV 4))
 (test (rinterp (cparse '{with {f {fun {x} {+ x x}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
