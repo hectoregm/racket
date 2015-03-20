@@ -6,6 +6,8 @@
   [numS (n number?)]
   [addS (lhs CFAES/L?)
         (rhs CFAES/L?)]
+  [multS (lhs CFAES/L?)
+         (rhs CFAES/L?)]
   [subS (lhs CFAES/L?)
         (rhs CFAES/L?)]
   [withS (name symbol?)
@@ -26,6 +28,8 @@
        (rhs CFAE/L?)]
   [sub (lhs CFAE/L?)
        (rhs CFAE/L?)]
+  [mult (lhs CFAE/L?)
+         (rhs CFAE/L?)]
   [id (name symbol?)]
   [if0 (test CFAE/L?)
        (truth CFAE/L?)
@@ -52,7 +56,7 @@
 ;; lookup : symbol Env -> FAE-Value
 (define (lookup name env)
   (type-case Env env
-    [mtSub () (error 'lookup "no binding for identifier")]
+    [mtSub () (error 'lookup (string-append (~a name) " expression is not a function"))]
     [aSub (bound-name bound-value env)
           (if (symbol=? bound-name name)
               bound-value
@@ -72,6 +76,8 @@
                   (parse (third sexp)))]
        [(-) (subS (parse (second sexp))
                   (parse (third sexp)))]
+       [(*) (multS (parse (second sexp))
+                   (parse (third sexp)))]
        [(if0) (if0S (parse (cadr sexp))
                     (parse (caddr sexp))
                     (parse (cadddr sexp)))]
@@ -90,6 +96,8 @@
                      (desugar r))]
     [subS (l r) (sub (desugar l)
                      (desugar r))]
+    [multS (l r) (mult (desugar l)
+                       (desugar r))]
     [if0S (t p f) (if0 (desugar t)
                        (desugar p)
                        (desugar f))]
@@ -116,6 +124,10 @@
   (numV (- (numV-n (strict numa))
            (numV-n (strict numb)))))
 
+(define (num* numa numb)
+  (numV (* (numV-n (strict numa))
+           (numV-n (strict numb)))))
+
 ;; strict : CFAE/L-Value -> CFAE/L-Value [excluding exprV]
 (define (strict e)
   (type-case CFAE/L-Value e
@@ -128,6 +140,7 @@
     [num (n) (numV n)]
     [add (l r) (num+ (interp l env) (interp r env))]
     [sub (l r) (num- (interp l env) (interp r env))]
+    [mult (l r) (num* (interp l env) (interp r env))]
     [id (v) (lookup v env)]
     [if0 (test truth falsity)
          (if (num-zero? (interp test env))
@@ -171,3 +184,5 @@
 (test (rinterp (cparse '{if0 {+ 0 0} 0 1})) (numV 0))
 (test (rinterp (cparse '{with {f {fun {x} {+ x x}}} {if0 {- 5 {+ 2 3}} {f 2} {f 3}}})) (numV 4))
 (test (rinterp (cparse '{with {f {fun {x} {+ x x}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
+
+(test (rinterp (cparse '{with {Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}})) (numV 720))
