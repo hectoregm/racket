@@ -8,6 +8,8 @@
        (rhs FWAE?)]
   [sub (lhs FWAE?)
        (rhs FWAE?)]
+  [mult (lhs FWAE?)
+        (rhs FWAE?)]
   [with (name symbol?)
         (named-expr FWAE?)
         (body FWAE?)]
@@ -27,6 +29,8 @@
                  (parse (third sexp)))]
        [(-) (sub (parse (second sexp))
                  (parse (third sexp)))]
+       [(*) (mult (parse (second sexp))
+                 (parse (third sexp)))]
        [(with) (with (first (second sexp))
                      (parse (second (second sexp)))
                      (parse (third sexp)))]
@@ -42,6 +46,8 @@
                     (subst r sub-id val))]
     [sub (l r) (sub (subst l sub-id val)
                     (subst r sub-id val))]
+    [mult (l r) (mult (subst l sub-id val)
+                      (subst r sub-id val))]
     [with (bound-id named-expr bound-body)
           (if (symbol=? bound-id sub-id)
               (with bound-id
@@ -62,6 +68,7 @@
     [num (n) n]
     [add (l r) (+ (calc l) (calc r))]
     [sub (l r) (- (calc l) (calc r))]
+    [mult (l r) (* (calc l) (calc r))]
     [with (bound-id named-expr bound-body)
           (calc (subst bound-body
                       bound-id
@@ -92,6 +99,10 @@
   (num (- (num-n numa)
           (num-n numb))))
 
+(define (mult-numbers numa numb)
+  (num (* (num-n numa)
+          (num-n numb))))
+
 ;; interp : FWAE -> FWAE
 ;; evaluates FWAE expressions by reducing them to their corresponding values
 ;; return values are either num or fun
@@ -100,11 +111,12 @@
     [num (n) expr]
     [add (l r) (add-numbers (interp l) (interp r))]
     [sub (l r) (rest-numbers (interp l) (interp r))]
+    [mult (l r) (mult-numbers (interp l) (interp r))]
     [with (bound-id named-expr bound-body)
           (interp (subst bound-body
                          bound-id
                          (interp named-expr)))]
-    [id (v) (error 'interp "free identifier")]
+    [id (v) (error 'interp (string-append (symbol->string v) "  free identifier"))]
     [fun (bound-id bound-body)
          expr]
     [app (fun-expr arg-expr)
@@ -128,3 +140,4 @@
 (test (interp (parse '{{{fun {x} x} {fun {x} {+ x 5}}} 3})) (num 8))
 (test (interp (parse '{with {x 3} {fun {y} {+ x y}}})) (fun 'y (add (num 3) (id 'y))))
 (test (interp (parse '{with {x 10} {{fun {y} {+ y x}} {+ 5 x}}})) (num 25))
+ (interp (parse '{with {x {+ 1 1}} {with {y 3} {with {z {* 1 4}} {with {foo {fun {a} z}} {foo 0}}}}}))
