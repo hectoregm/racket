@@ -2,13 +2,13 @@
 
 (require 2htdp/image 2htdp/universe)
 
-(struct pit (snake goos))
+(struct pit (snake goos) #:transparent)
 
-(struct snake (dir segs))
+(struct snake (dir segs) #:transparent)
 
-(struct posn (x y))
+(struct posn (x y) #:transparent)
 
-(struct goo (loc expire))
+(struct goo (loc expire) #:transparent)
 
 (define (start-snake)
   (big-bang (pit (snake "right" (list (posn 1 1)))
@@ -43,3 +43,25 @@
 
 (define (eat goos goo-to-eat)
   (cons (fresh-goo) (remove goo-to-eat goos)))
+
+(define (grow sn)
+  (snake (snake-dir sn)
+         (cons (next-head sn) (sake-segs sn))))
+
+(define (slither sn)
+  (snake (snake-dir sn)
+         (cons (next-head sn) (all-but-last (snake-segs sn)))))
+
+(define (all-but-last segs)
+  (cond
+    [(empty? (rest segs)) empty]
+    [else (cons (first segs) (all-but-last (rest segs)))]))
+
+(define (next-head sn)
+  (define head (snake-head sn))
+  (define dir (snake-dir sn)))
+
+(define (fresh-goo)
+  (goo (posn (add1 (random (sub1 SIZE)))
+             (add1 (random (sub1 SIZE))))
+       EXPIRATION-TIME))
