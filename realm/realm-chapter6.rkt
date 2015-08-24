@@ -77,12 +77,29 @@
 (define (eat goos goo-to-eat)
   (cons (fresh-goo) (remove goo-to-eat goos)))
 
+(define (dead? w)
+  (define snake (pit-snake w))
+  (or (self-colliding? snake) (wall-colliding? snake)))
+
+(define (render-end w)
+  (overlay (text "Game Over" ENDGAME-TEXT-SIZE "black")
+           (render-pit w)))
+
+(define (self-colliding? snake)
+  (cons? (member (snake-head snake) (snake-body snake))))
+
+(define (wall-colliding? snake)
+  (define x (posn-x (snake-head snake)))
+  (define y (posn-y (snake-head snake)))
+  (or (= 0 x) (= x SIZE)
+      (= 0 y) (= y SIZE)))
+
 (define (render-pit w)
   (snake+scene (pit-snake w)
                (goo-list+scene (pit-goos w) MT-SCENE)))
 (define (grow sn)
   (snake (snake-dir sn)
-         (cons (next-head sn) (sake-segs sn))))
+         (cons (next-head sn) (snake-segs sn))))
 
 (define (slither sn)
   (snake (snake-dir sn)
@@ -147,8 +164,8 @@
   (cond
     [(and (opposite-dir? (snake-dir the-snake) d)
           (cons? (rest (snake-segs the-snake))))
-     (stop-wth w)]
-    [else (pit (snake-change-dir the-snake d) (pit-goss w))]))
+     (stop-with w)]
+    [else (pit (snake-change-dir the-snake d) (pit-goos w))]))
 
 (define (opposite-dir? d1 d2)
   (cond
@@ -174,7 +191,7 @@
     [else (img+scene
            (first posns)
            img
-           (img-list-scene (rest posns) img scene))]))
+           (img-list+scene (rest posns) img scene))]))
 
 (define (img+scene posn img scene)
   (place-image img
@@ -189,3 +206,16 @@
       [else (cons (goo-loc (first goos))
                   (get-posns-from-goo (rest goos)))]))
   (img-list+scene (get-posns-from-goo goos) GOO-IMG scene))
+
+(define (posn=? p1 p2)
+      (and (= (posn-x p1) (posn-x p2))
+           (= (posn-y p1) (posn-y p2))))
+
+(define (snake-head sn)
+  (first (snake-segs sn)))
+(define (snake-body sn)
+  (rest (snake-segs sn)))
+(define (snake-tail sn)
+  (last (snake-segs sn)))
+(define (snake-change-dir sn d)
+  (snake d (snake-segs sn)))
