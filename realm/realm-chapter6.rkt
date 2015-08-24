@@ -77,6 +77,9 @@
 (define (eat goos goo-to-eat)
   (cons (fresh-goo) (remove goo-to-eat goos)))
 
+(define (render-pit w)
+  (snake+scene (pit-snake w)
+               (goo-list+scene (pit-goos w) MT-SCENE)))
 (define (grow sn)
   (snake (snake-dir sn)
          (cons (next-head sn) (sake-segs sn))))
@@ -127,3 +130,62 @@
   (goo (posn (add1 (random (sub1 SIZE)))
              (add1 (random (sub1 SIZE))))
        EXPIRATION-TIME))
+
+(define (direct-snake w ke)
+  (cond
+    [(dir? ke) (world-change-dir w ke)]
+    [else w]))
+
+(define (dir? x)
+  (or (key=? x "up")
+      (key=? x "down")
+      (key=? x "left")
+      (key=? x "right")))
+
+(define (world-change-dir w d)
+  (define the-snake (pit-snake w))
+  (cond
+    [(and (opposite-dir? (snake-dir the-snake) d)
+          (cons? (rest (snake-segs the-snake))))
+     (stop-wth w)]
+    [else (pit (snake-change-dir the-snake d) (pit-goss w))]))
+
+(define (opposite-dir? d1 d2)
+  (cond
+    [(string=? d1 "up") (string=? d2 "down")]
+    [(string=? d1 "down") (string=? d2 "up")]
+    [(string=? d1 "left") (string=? d2 "right")]
+    [(string=? d1 "right") (string=? d2 "left")]))
+
+(define (snake+scene snake scene)
+  (define snake-body-scene
+    (img-list+scene  (snake-body snake) SEG-IMG scene))
+  (define dir (snake-dir snake))
+  (img+scene (snake-head snake) 
+             (cond [(string=? "up" dir) HEAD-UP-IMG]
+                   [(string=? "down" dir) HEAD-DOWN-IMG]
+                   [(string=? "left" dir) HEAD-LEFT-IMG]
+                   [(string=? "right" dir) HEAD-RIGHT-IMG])
+             snake-body-scene))
+
+(define (img-list+scene posns img scene)
+  (cond
+    [(empty? posns) scene]
+    [else (img+scene
+           (first posns)
+           img
+           (img-list-scene (rest posns) img scene))]))
+
+(define (img+scene posn img scene)
+  (place-image img
+               (* (posn-x posn) SEG-SIZE)
+               (* (posn-y posn) SEG-SIZE)
+               scene))
+
+(define (goo-list+scene goos scene)
+  (define (get-posns-from-goo goos)
+    (cond
+      [(empty? goos) empty]
+      [else (cons (goo-loc (first goos))
+                  (get-posns-from-goo (rest goos)))]))
+  (img-list+scene (get-posns-from-goo goos) GOO-IMG scene))
