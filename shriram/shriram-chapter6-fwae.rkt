@@ -140,4 +140,36 @@
 (test (interp (parse '{{{fun {x} x} {fun {x} {+ x 5}}} 3})) (num 8))
 (test (interp (parse '{with {x 3} {fun {y} {+ x y}}})) (fun 'y (add (num 3) (id 'y))))
 (test (interp (parse '{with {x 10} {{fun {y} {+ y x}} {+ 5 x}}})) (num 25))
- (interp (parse '{with {x {+ 1 1}} {with {y 3} {with {z {* 1 4}} {with {foo {fun {a} z}} {foo 0}}}}}))
+
+
+;; (num 7)
+(interp (parse '{with {x 3}
+                      {with {f {fun {y} {+ x y}}}
+                            {with {x 5}
+                                  {f 4}}}}))
+
+(with 'x
+      (num 3)
+      (with 'f
+            (fun 'y (add (id 'x) (id 'y)))
+            (with 'x
+                  (num 5)
+                  (app (id 'f) (num 4)))))
+
+
+;; (num 4)
+(interp (parse '{with {x {+ 1 1}}
+                      {with {y 3}
+                            {with {z {* 1 4}}
+                                  {with {foo {fun {a} z}}
+                                        {foo x}}}}}))
+
+(with 'x
+      (add (num 1) (num 1))
+      (with 'y
+            (num 3)
+            (with 'z
+                  (mult (num 1) (num 4))
+                  (with 'foo
+                        (fun 'a (id 'z))
+                        (app (id 'foo) (id 'x))))))
