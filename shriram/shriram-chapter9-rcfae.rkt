@@ -20,8 +20,6 @@
         (body RCFAES?)]
   [appS (fun RCFAES?)
         (args (listof RCFAES?))]
-  [recS (bound-id symbol?)
-        (named )]
   [binopS (f procedure?)
           (l RCFAES?)
           (r RCFAES?)])
@@ -194,11 +192,6 @@
                    (extend-env (closureV-param fun-val)
                                (map (lambda (arg) (interp arg env)) args)
                                (closureV-env fun-val))))]
-    [rec (bound-id named-expr bound-body)
-      (interp bound-body
-              (cyclically-bind-and-interp bound-id
-                                          named-expr
-                                          env))]
     [binop (f l r) (apply-binop f (interp l env) (interp r env))]))
 
 (define (rinterp expr)
@@ -227,4 +220,4 @@
 (test (rinterp (cparse '{with {{f {fun {x} {+ x x}}}} {if0 {- 5 {+ 2 3}} {f 2} {f 3}}})) (numV 4))
 (test (rinterp (cparse '{with {{f {fun {x} {+ x x}}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
 (test (rinterp (cparse '{with {{Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}})) (numV 720))
-(test/exn (rinterp (cparse '{with {{fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}}} {fac 5}})) "fac symbol")
+;;(test/exn (rinterp (cparse '{with {{fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}}} {fac 5}})) "fac symbol")
