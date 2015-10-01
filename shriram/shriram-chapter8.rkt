@@ -8,6 +8,8 @@
         (rhs CFAES/L?)]
   [multS (lhs CFAES/L?)
          (rhs CFAES/L?)]
+  [divS (lhs CFAES/L?)
+        (rhs CFAES/L?)]
   [subS (lhs CFAES/L?)
         (rhs CFAES/L?)]
   [withS (name symbol?)
@@ -29,7 +31,9 @@
   [sub (lhs CFAE/L?)
        (rhs CFAE/L?)]
   [mult (lhs CFAE/L?)
-         (rhs CFAE/L?)]
+        (rhs CFAE/L?)]
+  [div (lhs CFAE/L?)
+       (rhs CFAE/L?)]
   [id (name symbol?)]
   [if0 (test CFAE/L?)
        (truth CFAE/L?)
@@ -78,6 +82,8 @@
                   (parse (third sexp)))]
        [(*) (multS (parse (second sexp))
                    (parse (third sexp)))]
+       [(/) (divS (parse (second sexp))
+                  (parse (third sexp)))]
        [(if0) (if0S (parse (cadr sexp))
                     (parse (caddr sexp))
                     (parse (cadddr sexp)))]
@@ -98,6 +104,8 @@
                      (desugar r))]
     [multS (l r) (mult (desugar l)
                        (desugar r))]
+    [divS (l r) (div (desugar l)
+                     (desugar r))]
     [if0S (t p f) (if0 (desugar t)
                        (desugar p)
                        (desugar f))]
@@ -128,6 +136,10 @@
   (numV (* (numV-n (strict numa))
            (numV-n (strict numb)))))
 
+(define (num/ numa numb)
+  (numV (/ (numV-n (strict numa))
+           (numV-n (strict numb)))))
+
 ;; strict : CFAE/L-Value -> CFAE/L-Value [excluding exprV]
 (define (strict e)
   (type-case CFAE/L-Value e
@@ -141,6 +153,7 @@
     [add (l r) (num+ (interp l env) (interp r env))]
     [sub (l r) (num- (interp l env) (interp r env))]
     [mult (l r) (num* (interp l env) (interp r env))]
+    [div (l r) (num/ (interp l env) (interp r env))]
     [id (v) (lookup v env)]
     [if0 (test truth falsity)
          (if (num-zero? (interp test env))
