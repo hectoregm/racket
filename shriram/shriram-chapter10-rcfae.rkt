@@ -20,6 +20,9 @@
         (body RCFAES?)]
   [appS (fun RCFAES?)
         (args (listof RCFAES?))]
+  [recS (name symbol?)
+        (named-expr RCFAES?)
+        (body RCFAES?)]
   [binopS (f procedure?)
           (l RCFAES?)
           (r RCFAES?)])
@@ -35,6 +38,9 @@
        (body RCFAE?)]
   [app (fun RCFAE?)
        (args (listof RCFAE?))]
+  [rec (name symbol?)
+       (named-expr RCFAE?)
+       (body RCFAE?)]
   [binop (f procedure?)
          (l RCFAE?)
          (r RCFAE?)])
@@ -110,6 +116,9 @@
        [(if0) (if0S (parse (cadr sexp))
                     (parse (caddr sexp))
                     (parse (cadddr sexp)))]
+       [(rec) (recS (caadr sexp)
+                    (parse (cadadr sexp))
+                    (parse (caddr sexp)))]
        [else (appS (parse (car sexp)) (map parse (cdr sexp)))])]))
 
 ;; lookup : symbol Env -> RCFAE-Value
@@ -147,7 +156,10 @@
                        (desugar p)
                        (desugar f))]
     [funS (params body) (fun params (desugar body))]
-    [appS (fun args) (app (desugar fun) (map (lambda (arg) (desugar arg)) args))]))
+    [appS (fun args) (app (desugar fun) (map (lambda (arg) (desugar arg)) args))]
+    [recS (name named-expr body) (rec name
+                                   (desugar named-expr)
+                                   (desugar body))]))
 
 (test (desugar (parse '{+ 3 4})) (binop + (num 3) (num 4)))
 (test (desugar (parse '{+ {- 3 4} 7})) (binop + (binop - (num 3) (num 4)) (num 7)))
@@ -183,6 +195,10 @@
                    (extend-env (closureV-param fun-val)
                                (map (lambda (arg) (interp arg env)) args)
                                (closureV-env fun-val))))]
+    [rec (bound-id named-expr bound-body)
+      (interp bound-body (cyclically-bind-and-interp bound-id
+                                                     named-expr
+                                                     env))]
     [binop (f l r) (apply-binop f (interp l env) (interp r env))]))
 
 (define (rinterp expr)
@@ -211,4 +227,5 @@
 (test (rinterp (cparse '{with {{f {fun {x} {+ x x}}}} {if0 {- 5 {+ 2 3}} {f 2} {f 3}}})) (numV 4))
 (test (rinterp (cparse '{with {{f {fun {x} {+ x x}}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
 (test (rinterp (cparse '{with {{Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}})) (numV 720))
-;;(test/exn (rinterp (cparse '{with {{fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}}} {fac 5}})) "fac symbol")
+(test/exn (rinterp (cparse '{with {{fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}}} {fac 5}})) "fac symbol")
+(test (rinterp (cparse '{rec {fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}} {fac 6}})) (numV 720))
