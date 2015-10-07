@@ -51,48 +51,39 @@
         (value CFAE-Value?) 
         (env Env?)])
 
-; FUNCIONES AUXILIARES
-
 ;; A::= <number>|<symbol>|listof(<A>)
 ;; B::= (list <symbol> <A>)
 ;; parse-bindings: listof(B) -> listof(bind?)
-;; "Parsea" la lista de bindings lst en sintaxis concreta
-;; mientras revisa la lista de id's en busca de repetidos.
-;; (define (parse-bindings lst) 
 (define (parse-bindings lst)
-  (let ([bindRep (buscaRepetido lst (lambda (e1 e2) (symbol=? (car e1) (car e2))))])
-    (if (boolean? bindRep)
+  (let ([duplicates (find-duplicate lst (lambda (e1 e2) (symbol=? (car e1) (car e2))))])
+    (if (boolean? duplicates)
         (map (lambda (b) (bind (car b) (parse (cadr b)))) lst)
-        (error 'parse-bindings (string-append "El id " (symbol->string (car bindRep)) " está repetido")))))
+        (error 'parse-bindings (string-append "Id" (symbol->string (car duplicates)) " is duplicated")))))
 
-(define (elige s)
+(define (lookup-op s)
   (case s
     [(+) +]
     [(-) -]
     [(*) *]
     [(/) /]))
 
-;; buscaRepetido: listof(X) (X X -> boolean) -> X
-;; Dada una lista, busca repeticiones dentro de la misma
-;; usando el criterio comp. Regresa el primer elemento repetido
-;; o falso eoc.
-;; (define (buscaRepetido l comp) 
-(define (buscaRepetido l comp) 
+;; find-duplicate: listof(X) (X X -> boolean) -> X
+;; Given a list, it searches for the duplicates in the list,
+;; using comp. It returns the first repeated element or false.
+(define (find-duplicate lst comp)
   (cond
-    [(empty? l) #f]
-    [(member? (car l) (cdr l) comp) (car l)]
-    [else (buscaRepetido (cdr l) comp)]))
+    [(empty? lst) #f]
+    [(member? (car lst) (cdr lst) comp) (car lst)]
+    [else (find-duplicate (cdr lst) comp)]))
 
 ;; member?: X listof(Y) (X Y -> boolean) -> boolean
-;; Determina si x está en l usando "comparador" para
-;; comparar x con cada elemento de la lista.
-;; (define (member? x l comparador)
-(define (member? x l comparador)
+;; Determines if a given x is in the list using
+;; a given comp function.
+(define (member? x lst comp)
   (cond
-    [(empty? l) #f]
-    [(comparador (car l) x) #t]
-    [else (member? x (cdr l) comparador)]))
-
+    [(empty? lst) #f]
+    [(comp (car lst) x) #t]
+    [else (member? x (cdr lst) comp)]))
 
 ;; num-zero? CFAE-Value -> boolean
 (define (num-zero? n)
@@ -108,7 +99,7 @@
      (case (car sexp)
        [(with) (withS (parse-bindings (cadr sexp)) (parse (caddr sexp)))]
        [(fun) (funS (cadr sexp) (parse (caddr sexp)))]
-       [(+ - / *) (binopS (elige (car sexp)) (parse (cadr sexp)) (parse (caddr sexp)))]
+       [(+ - / *) (binopS (lookup-op (car sexp)) (parse (cadr sexp)) (parse (caddr sexp)))]
        [(if0) (if0S (parse (cadr sexp))
                     (parse (caddr sexp))
                     (parse (cadddr sexp)))]
