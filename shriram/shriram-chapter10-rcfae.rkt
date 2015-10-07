@@ -137,7 +137,8 @@
 ;; cyclically-bind-and-interp : symbol RCFAE env ! env 
 (define (cyclically-bind-and-interp bound-id named-expr env)
   (local ([define value-holder (box (numV 1729))]
-          [define new-env (aRecSub bound-id value-holder env)] [define named-expr-val (interp named-expr new-env)])
+          [define new-env (aRecSub bound-id value-holder env)]
+          [define named-expr-val (interp named-expr new-env)])
     (begin
       (set-box! value-holder named-expr-val) new-env)))
 
