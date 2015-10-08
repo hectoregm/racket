@@ -1,6 +1,5 @@
 #lang plai
 
-
 (define the-receiver (box 'dummy-value))
 (define receiver-prompt (box 'dummy-value))
 
@@ -23,4 +22,7 @@
                                (lambda (y)
                                  (web-display (+ x y))))))
 
-;;(web-read/k "First number" receiver)
+(define (tally-old item-list)
+  (if (empty? item-list)
+      0
+      (+ (web-read (generate-item-cost-prompt (first))))))
