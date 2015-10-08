@@ -17,3 +17,8 @@
   (begin
     (display (unbox receiver-prompt))
     ((unbox the-receiver) (read))))
+
+(define receiver (lambda (x)
+                   (web-read/k "Second number"
+                               (lambda (y)
+                                 (web-display (+ x y))))))
