@@ -140,3 +140,9 @@
 (test (interp (desugar (parse '{{{fun {x} x} {fun {x} {+ x 5}}} 3}))) (num 8))
 (test (interp (desugar (parse '{with {x 3} {fun {y} {+ x y}}}))) (fun 'y (add (num 3) (id 'y))))
 (test (interp (desugar (parse '{with {x 10} {{fun {y} {+ y x}} {+ 5 x}}}))) (num 25))
+(test (interp (desugar (parse '{with {x 1}
+                                     {with {x {+ 1 1}}
+                                           {with {foo {fun {y} {+ y {+ x {+ x y}}}}}
+                                                 {with {x {+ 1 2}}
+                                                       {with {x {+ 2 2}}
+                                                             {foo 5}}}}}}))) (num 14))

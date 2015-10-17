@@ -129,3 +129,9 @@
 (test (interp (desugar (parse '{with {x 3} {fun {y} {+ x y}}})) (mtSub)) (closureV 'y (add (id 'x) (id 'y)) (aSub 'x (numV 3) (mtSub))))
 (test (interp (desugar (parse '{with {x 3} {with {f {fun {y} {+ x y}}} {with {x 5} {f 4}}}})) (mtSub)) (numV 7))
 (test (interp (desugar (parse '{with {x 10} {{fun {y} {+ y x}} {+ 5 x}}})) (mtSub)) (numV 25))
+(test (interp (desugar (parse '{with {x 1}
+                                     {with {x {+ 1 1}}
+                                           {with {foo {fun {y} {+ y {+ x {+ x y}}}}}
+                                                 {with {x {+ 1 2}}
+                                                       {with {x {+ 2 2}}
+                                                             {foo 5}}}}}})) (mtSub)) (numV 14))

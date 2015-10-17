@@ -199,3 +199,10 @@
 (test (rinterp (cparse '{with {f {fun {x} {+ x x}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
 
 (test (rinterp (cparse '{with {Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}})) (numV 720))
+
+(test (rinterp (cparse '{with {x 1}
+                              {with {x {+ 1 1}}
+                                    {with {foo {fun {y} {+ y {+ x {+ x y}}}}}
+                                          {with {x {+ 1 2}}
+                                                {with {x {+ 2 2}}
+                                                      {foo 5}}}}}})) (numV 14))
