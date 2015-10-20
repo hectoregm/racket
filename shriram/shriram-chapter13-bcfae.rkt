@@ -1,6 +1,6 @@
 #lang plai
 
-(print-only-errors true)
+(print-only-errors false)
 
 ;; Binding - Defines a datatype that represents a given symbol
 ;; and its associsated CFAES expresion.
@@ -39,7 +39,7 @@
          (l BCFAE?)
          (r BCFAE?)])
 
-(define-type CFAE-Value
+(define-type BCFAE-Value
   [numV (n number?)]
   [closureV (param (listof symbol?))
             (body BCFAE?)
@@ -48,8 +48,14 @@
 (define-type Env
   [mtSub]
   [aSub (name symbol?) 
-        (value CFAE-Value?) 
+        (location number?)
         (env Env?)])
+
+(define-type Store
+  [mtSto]
+  [aSto (location number?)
+        (value BCFAE-Value?)
+        (store Store?)])
 
 ;; A::= <number>|<symbol>|listof(<A>)
 ;; B::= (list <symbol> <A>)
@@ -105,14 +111,23 @@
                     (parse (cadddr sexp)))]
        [else (appS (parse (car sexp)) (map parse (cdr sexp)))])]))
 
-;; lookup : symbol Env -> CFAE-Value
-(define (lookup name env)
+;; env-lookup : symbol Env -> location
+(define (env-lookup name env)
   (type-case Env env
-    [mtSub () (error 'lookup (string-append (~a name) " symbol is not in the env"))]
-    [aSub (bound-name bound-value env)
+    [mtSub () (error 'env-lookup (string-append (~a name) " binding is not in the env"))]
+    [aSub (bound-name bound-location env)
           (if (symbol=? bound-name name)
-              bound-value
-              (lookup name env))]))
+              bound-location
+              (env-lookup name env))]))
+
+;; store-lookup : symbol Store -> BCFAE-Value
+(define (store-lookup loc-index store)
+  (type-case Store store
+    [mtSto () (error 'store-lookup (string-append (~a loc-index) " no value at location"))]
+    [aSto (location value store)
+          (if (= location loc-index)
+              value
+              (store-lookup loc-index store))]))
 
 (define (desugar expr)
   (type-case BCFAES expr
@@ -148,26 +163,27 @@
                 (car args)
                 (extend-env (cdr params) (cdr args) env))]))
 
-(define (interp expr env)
+(define (interp expr env store)
   (type-case BCFAE expr
     [num (n) (numV n)]
-    [id (v) (lookup v env)]
+    [id (v) (env-lookup v env)]
     [if0 (test truth falsity)
-         (if (num-zero? (interp test env))
-             (interp truth env)
-             (interp falsity env))]
+         (if (num-zero? (interp test env store))
+             (interp truth env store)
+             (interp falsity env store))]
     [fun (params bound-body)
          (closureV params bound-body env)]
     [app (fun-expr args)
-         (local ([define fun-val (interp fun-expr env)])
+         (local ([define fun-val (interp fun-expr env store)])
            (interp (closureV-body fun-val)
                    (extend-env (closureV-param fun-val)
-                               (map (lambda (arg) (interp arg env)) args)
-                               (closureV-env fun-val))))]
-    [binop (f l r) (apply-binop f (interp l env) (interp r env))]))
+                               (map (lambda (arg) (interp arg env store)) args)
+                               (closureV-env fun-val))
+                   store))]
+    [binop (f l r) (apply-binop f (interp l env store) (interp r env store))]))
 
 (define (rinterp expr)
-  (interp expr (mtSub)))
+  (interp expr (mtSub) (mtSto)))
 
 (test (rinterp (cparse '3)) (numV 3))
 (test (rinterp (cparse '{+ 3 4})) (numV 7))
