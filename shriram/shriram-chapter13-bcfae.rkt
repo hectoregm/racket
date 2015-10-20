@@ -5,44 +5,44 @@
 ;; Binding - Defines a datatype that represents a given symbol
 ;; and its associsated CFAES expresion.
 (define-type Binding
-  [bind (name symbol?) (val CFAES?)])
+  [bind (name symbol?) (val BCFAES?)])
 
 ;; CFAES - Datatype that defines the surface CFAE language.
-(define-type CFAES
+(define-type BCFAES
   [numS (n number?)]
   [withS (bindings (listof bind?))
-         (body CFAES?)]
+         (body BCFAES?)]
   [idS (name symbol?)]
-  [if0S (test CFAES?)
-        (truth CFAES?)
-        (falsity CFAES?)]
+  [if0S (test BCFAES?)
+        (truth BCFAES?)
+        (falsity BCFAES?)]
   [funS (params (listof symbol?))
-        (body CFAES?)]
-  [appS (fun CFAES?)
-        (args (listof CFAES?))]
+        (body BCFAES?)]
+  [appS (fun BCFAES?)
+        (args (listof BCFAES?))]
   [binopS (f procedure?)
-          (l CFAES?)
-          (r CFAES?)])
+          (l BCFAES?)
+          (r BCFAES?)])
 
 ;; CFAE - Datatype that defines the Core CFAE language
-(define-type CFAE
+(define-type BCFAE
   [num (n number?)]
   [id (name symbol?)]
-  [if0 (test CFAE?)
-        (truth CFAE?)
-        (falsity CFAE?)]
+  [if0 (test BCFAE?)
+        (truth BCFAE?)
+        (falsity BCFAE?)]
   [fun (params (listof symbol?))
-       (body CFAE?)]
-  [app (fun CFAE?)
-       (args (listof CFAE?))]
+       (body BCFAE?)]
+  [app (fun BCFAE?)
+       (args (listof BCFAE?))]
   [binop (f procedure?)
-         (l CFAE?)
-         (r CFAE?)])
+         (l BCFAE?)
+         (r BCFAE?)])
 
 (define-type CFAE-Value
   [numV (n number?)]
   [closureV (param (listof symbol?))
-            (body CFAE?)
+            (body BCFAE?)
             (env Env?)])
 
 (define-type Env
@@ -115,7 +115,7 @@
               (lookup name env))]))
 
 (define (desugar expr)
-  (type-case CFAES expr
+  (type-case BCFAES expr
     [numS (n) (num n)]
     [idS (s) (id s)]
     [binopS (f l r) (binop f (desugar l) (desugar r))]
@@ -149,7 +149,7 @@
                 (extend-env (cdr params) (cdr args) env))]))
 
 (define (interp expr env)
-  (type-case CFAE expr
+  (type-case BCFAE expr
     [num (n) (numV n)]
     [id (v) (lookup v env)]
     [if0 (test truth falsity)
