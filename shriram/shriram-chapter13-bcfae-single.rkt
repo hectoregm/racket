@@ -49,7 +49,8 @@
   [numV (n number?)]
   [closureV (param symbol?)
             (body BCFAE?)
-            (env Env?)])
+            (env Env?)]
+  [boxV (location number?)])
 
 (define-type Env
   [mtSub]
@@ -156,7 +157,9 @@
 (define (interp expr env store)
   (type-case BCFAE expr
     [num (n) (v*s (numV n) store)]
-    [id (v) (v*s (store-lookup (env-lookup v env) store) store)]
+    [id (v) (begin
+              ;;(display env)
+              (v*s (store-lookup (env-lookup v env) store) store))]
     [if0 (test truth falsity)
          (type-case Value*Store (interp test env store)
            [v*s (test-value test-store)
@@ -192,10 +195,31 @@
                     [v*s (r-value r-store)
                          (v*s (apply-binop f l-value r-value)
                               r-store)])])]
-    [newbox (value-expr) (error 'interp "newbox not implemented")]
-    [setbox (box-expr value-expr) (error 'interp "setbox not implemented")]
-    [openbox (box-expr) (error 'interp "openbox not implemented")]
-    [seqn (expr1 expr2) (error 'interp "seqn not implemented")]))
+    [newbox (value-expr)
+            (type-case Value*Store (interp value-expr env store)
+              [v*s (expr-value expr-store)
+                   (local ([define new-loc (next-location expr-store)])
+                     (v*s (boxV new-loc)
+                          (aSto new-loc expr-value expr-store)))])]
+    [setbox (box-expr value-expr)
+            (type-case Value*Store (interp box-expr env store)
+              [v*s (box-value box-store)
+                   (type-case Value*Store (interp value-expr env box-store)
+                     [v*s (value-value value-store)
+                          (v*s value-value
+                               (aSto (boxV-location box-value)
+                                     value-value
+                                     value-store))])])]
+    [openbox (box-expr)
+             (type-case Value*Store (interp box-expr env store)
+               [v*s (box-value box-store)
+                    (v*s (store-lookup (boxV-location box-value)
+                                       box-store)
+                         box-store)])]
+    [seqn (e1 e2)
+          (type-case Value*Store (interp e1 env store)
+            [v*s (e1-value e1-store)
+                 (interp e2 env e1-store)])]))
 
 (define (rinterp expr)
   (interp expr (mtSub) (mtSto)))
@@ -225,8 +249,13 @@
 (test (rinterp (cparse '{if0 {+ 0 -5} 1 1})) (v*s (numV 1) (mtSto)))
 (test (v*s-value (rinterp (cparse '{with {Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}}))) (numV 720))
 
-(test (rinterp (cparse '{with {b {newbox 0}}
-                              {if0 {seqn {setbox b 5}
-                                         {openbox b}}
-                                   1
-                                   {openbox b}}})) (numV 5))
+(test (v*s-value (rinterp (cparse '{with {b {newbox 0}}
+                                         {if0 {seqn {setbox b 5}
+                                                    {openbox b}}
+                                              1
+                                              {openbox b}}}))) (numV 5))
+(test (v*s-value (rinterp (cparse '{with {b {newbox 0}}
+                                         {if0 {seqn {setbox b 5}
+                                                    {openbox b}}
+                                              1
+                                              b}}))) (boxV 52))
