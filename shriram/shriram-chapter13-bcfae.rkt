@@ -7,7 +7,7 @@
 (define-type Binding
   [bind (name symbol?) (val BCFAES?)])
 
-;; CFAES - Datatype that defines the surface CFAE language.
+;; BCFAES - Datatype that defines the surface BCFAE language.
 (define-type BCFAES
   [numS (n number?)]
   [withS (bindings (listof bind?))
@@ -22,9 +22,15 @@
         (args (listof BCFAES?))]
   [binopS (f procedure?)
           (l BCFAES?)
-          (r BCFAES?)])
+          (r BCFAES?)]
+  [newboxS (value-expr BCFAES?)]
+  [setboxS (box-expr BCFAES?)
+           (value-epxr BCFAES?)]
+  [openboxS (box-expr BCFAES?)]
+  [seqnS (expr1 BCFAES?)
+         (expr2 BCFAES?)])
 
-;; CFAE - Datatype that defines the Core CFAE language
+;; BCFAE - Datatype that defines the Core BCFAE language
 (define-type BCFAE
   [num (n number?)]
   [id (name symbol?)]
@@ -37,7 +43,13 @@
        (args (listof BCFAE?))]
   [binop (f procedure?)
          (l BCFAE?)
-         (r BCFAE?)])
+         (r BCFAE?)]
+  [newbox (value-expr BCFAE?)]
+  [setbox (box-expr BCFAE?)
+           (value-epxr BCFAE?)]
+  [openbox (box-expr BCFAE?)]
+  [seqn (expr1 BCFAE?)
+        (expr2 BCFAE?)])
 
 (define-type BCFAE-Value
   [numV (n number?)]
@@ -56,6 +68,10 @@
   [aSto (location number?)
         (value BCFAE-Value?)
         (store Store?)])
+
+(define-type Value*Store
+  [v*s (value BCFAE-Value?)
+       (store Store?)])
 
 ;; A::= <number>|<symbol>|listof(<A>)
 ;; B::= (list <symbol> <A>)
@@ -109,6 +125,10 @@
        [(if0) (if0S (parse (cadr sexp))
                     (parse (caddr sexp))
                     (parse (cadddr sexp)))]
+       [(newbox) (newboxS (parse (cadr sexp)))]
+       [(setbox) (setboxS (parse (cadr sexp)) (parse (caddr sexp)))]
+       [(openbox) (openboxS (parse (cadr sexp)))]
+       [(seqn) (seqnS (parse (cadr sexp)) (parse (caddr sexp)))]
        [else (appS (parse (car sexp)) (map parse (cdr sexp)))])]))
 
 ;; env-lookup : symbol Env -> location
@@ -143,8 +163,11 @@
                        (desugar p)
                        (desugar f))]
     [funS (params body) (fun params (desugar body))]
-    [appS (fun args) (app (desugar fun) (map (lambda (arg) (desugar arg)) args))]))
-
+    [appS (fun args) (app (desugar fun) (map (lambda (arg) (desugar arg)) args))]
+    [newboxS (value-expr) (newbox (desugar value-expr))]
+    [setboxS (box-expr value-expr) (setbox (desugar box-expr) (desugar value-expr))]
+    [openboxS (box-expr) (openbox (desugar box-expr))]
+    [seqnS (expr1 expr2) (seqn (desugar expr1) (desugar expr2))]))
 (test (desugar (parse '{+ 3 4})) (binop + (num 3) (num 4)))
 (test (desugar (parse '{+ {- 3 4} 7})) (binop + (binop - (num 3) (num 4)) (num 7)))
 (test (desugar (parse '{with {{x {+ 5 5}}} x})) (app (fun '(x) (id 'x)) (list (binop + (num 5) (num 5))) ))
@@ -163,10 +186,11 @@
                 (car args)
                 (extend-env (cdr params) (cdr args) env))]))
 
+;; interp BCFAE Env Store -> ValuexStore
 (define (interp expr env store)
   (type-case BCFAE expr
     [num (n) (numV n)]
-    [id (v) (env-lookup v env)]
+    [id (v) (store-lookup (env-lookup v env) store)]
     [if0 (test truth falsity)
          (if (num-zero? (interp test env store))
              (interp truth env store)
@@ -180,7 +204,11 @@
                                (map (lambda (arg) (interp arg env store)) args)
                                (closureV-env fun-val))
                    store))]
-    [binop (f l r) (apply-binop f (interp l env store) (interp r env store))]))
+    [binop (f l r) (apply-binop f (interp l env store) (interp r env store))]
+    [newbox (value-expr) (error 'interp "newbox not implemented")]
+    [setbox (box-expr value-expr) (error 'interp "setbox not implemented")]
+    [openbox (box-expr) (error 'interp "openbox not implemented")]
+    [seqn (expr1 expr2) (error 'interp "seqn not implemented")]))
 
 (define (rinterp expr)
   (interp expr (mtSub) (mtSto)))
@@ -209,3 +237,9 @@
 (test (rinterp (cparse '{with {{f {fun {x} {+ x x}}}} {if0 {- 5 {+ 2 4}} {f 2} {f 3}}})) (numV 6))
 (test (rinterp (cparse '{with {{Y {fun {le} {{fun {f} {f f}} {fun {f} {le {fun {x} {{f f} x}}}}}}}} {{Y {fun {factorial} {fun {n} {if0 n 1 {* n {factorial {- n 1}}}}}}} 6}})) (numV 720))
 (test/exn (rinterp (cparse '{with {{fac {fun {n} {if0 n 1 {* n {fac {+ n -1}}}}}}} {fac 5}})) "fac symbol")
+
+(test (rinterp (cparse '{with {{b {newbox 0}}}
+                              {if0 {seqn {setbox b 5}
+                                         {openbox b}}
+                                   1
+                                   {openbox b}}})) (numV 5))
