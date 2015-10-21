@@ -112,7 +112,7 @@
   (zero? (numV-n n)))
 
 ;; A::= <number>|<symbol>|listof(<A>)
-;; parse: A -> CFAES
+;; parse: A -> BCFAES
 (define (parse sexp)
   (cond
     [(symbol? sexp) (idS sexp)]
@@ -175,9 +175,9 @@
 (define (cparse sexp)
   (desugar (parse sexp)))
 
-(define (apply-binop fun numa numb)
-  (numV (fun (numV-n numa)
-             (numV-n numb))))
+(define (apply-binop fun num-a num-b)
+  (numV (fun (numV-n num-a)
+             (numV-n num-b))))
 
 (define (extend-env params args env)
   (cond
@@ -186,25 +186,40 @@
                 (car args)
                 (extend-env (cdr params) (cdr args) env))]))
 
+(define (interp-args args env store)
+  (cond
+    [(empty? args) ]))
+
 ;; interp BCFAE Env Store -> ValuexStore
 (define (interp expr env store)
   (type-case BCFAE expr
-    [num (n) (numV n)]
-    [id (v) (store-lookup (env-lookup v env) store)]
+    [num (n) (v*s (numV n) store)]
+    [id (v) (v*s (store-lookup (env-lookup v env) store) store)]
     [if0 (test truth falsity)
-         (if (num-zero? (interp test env store))
-             (interp truth env store)
-             (interp falsity env store))]
+         (type-case Value*Store (interp test env store)
+           [v*s (test-value test-store)
+                (if (num-zero? test-value)
+                    (interp truth env test-store)
+                    (interp falsity env test-store))])]
     [fun (params bound-body)
-         (closureV params bound-body env)]
+         (v*s (closureV params bound-body env) store)]
     [app (fun-expr args)
-         (local ([define fun-val (interp fun-expr env store)])
-           (interp (closureV-body fun-val)
-                   (extend-env (closureV-param fun-val)
-                               (map (lambda (arg) (interp arg env store)) args)
-                               (closureV-env fun-val))
-                   store))]
-    [binop (f l r) (apply-binop f (interp l env store) (interp r env store))]
+         (type-case Value*Store (interp fun-expr env store)
+           [v*s (fun-value fun-store)
+                (type-case Value*Store )])]
+;         (local ([define fun-val (interp fun-expr env store)])
+;           (interp (closureV-body fun-val)
+;                   (extend-env (closureV-param fun-val)
+;                               (map (lambda (arg) (interp arg env store)) args)
+;                               (closureV-env fun-val))
+;                   store))]
+    [binop (f l r)
+           (type-case Value*Store (interp l env store)
+             [v*s (l-value l-store)
+                  (type-case Value*Store (interp r env l-store)
+                    [v*s (r-value r-store)
+                         (v*s (apply-binop f l-value r-value)
+                              r-store)])])]
     [newbox (value-expr) (error 'interp "newbox not implemented")]
     [setbox (box-expr value-expr) (error 'interp "setbox not implemented")]
     [openbox (box-expr) (error 'interp "openbox not implemented")]
@@ -213,9 +228,9 @@
 (define (rinterp expr)
   (interp expr (mtSub) (mtSto)))
 
-(test (rinterp (cparse '3)) (numV 3))
-(test (rinterp (cparse '{+ 3 4})) (numV 7))
-(test (rinterp (cparse '{+ {- 3 4} 7})) (numV 6))
+(test (rinterp (cparse '3)) (v*s (numV 3) (mtSto)))
+(test (rinterp (cparse '{+ 3 4})) (v*s (numV 7) (mtSto)))
+(test (rinterp (cparse '{+ {- 3 4} 7})) (v*s (numV 6) (mtSto)))
 (test (rinterp (cparse '{with {{x {+ 5 5}}} {+ x x}})) (numV 20))
 (test (rinterp (cparse '{with {{x 5}} {+ x x}})) (numV 10))
 (test (rinterp (cparse '{with {{x {+ 5 5}}} {with {{y {- x 3}}} {+ y y}}})) (numV 14))
